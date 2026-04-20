@@ -1,0 +1,48 @@
+{
+  "name": "yunnan-municipal-data-portal",
+  "private": true,
+  "version": "1.0.0",
+  "description": "云南省企业数据采集系统 - 全栈版本（前端 + 后端 + Supabase）",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite --port=3000 --host=0.0.0.0",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "db:init": "echo '请先运行 supabase/schema.sql，再按需运行 supabase/seed_test_data.sql，然后执行 npm run db:seed 写入演示企业与填报'",
+    "db:seed": "tsx scripts/seed-demo.ts",
+    "db:seed:sql": "echo '请在 Supabase SQL Editor 中运行 supabase/seed_test_data.sql（补充周期/政策/网格）'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^3.5.0",
+    "vite": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.21",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}
