@@ -4,7 +4,7 @@
  * 用法：npm run db:seed
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type User } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -382,10 +382,10 @@ const DEMOS: DemoEnterprise[] = [
   },
 ];
 
-async function getUserByEmail(email: string) {
+async function getUserByEmail(email: string): Promise<User | null> {
   const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (error) throw error;
-  return data.users.find((u) => u.email === email) ?? null;
+  return (data.users as User[]).find((u) => u.email === email) ?? null;
 }
 
 async function ensureUser(email: string, password: string) {

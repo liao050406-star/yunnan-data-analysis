@@ -14,25 +14,59 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_ANON_KEY =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    'Missing Supabase config. Please set SUPABASE_URL (or VITE_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY in .env.'
+  );
+}
+const SUPABASE_AUTH_KEY = SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPABASE_AUTH_KEY) {
+  throw new Error('Missing Supabase auth key. Please set SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY in .env.');
+}
+const RESOLVED_SUPABASE_URL: string = SUPABASE_URL;
+const RESOLVED_SERVICE_ROLE_KEY: string = SUPABASE_SERVICE_ROLE_KEY;
+const RESOLVED_AUTH_KEY: string = SUPABASE_AUTH_KEY;
 
 // ─── Supabase Admin Client (service role, never store user session) ──────────
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  RESOLVED_SUPABASE_URL,
+  RESOLVED_SERVICE_ROLE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
 // 每次登录请求使用独立的 auth client，避免把用户 session 写入全局 client。
 function createAuthClientForSignIn() {
   return createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    RESOLVED_SUPABASE_URL,
+    RESOLVED_AUTH_KEY,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.APP_URL || 'http://localhost:3000', credentials: true }));
+const allowedOrigins = new Set([
+  process.env.APP_URL || 'http://localhost:3000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || process.env.NODE_ENV !== 'production' || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`Origin ${origin} is not allowed by CORS`));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // ─── Auth Helper: verify Bearer token from Supabase ──────────────────────────
@@ -676,11 +710,16 @@ app.get('/api/analytics/by-region', requireAuth, async (req, res) => {
     period_quarter: number;
     enterprise_filings: { address: string | null; status: string } | null;
   };
+  type RawSubRow = Omit<SubRow, 'enterprise_filings'> & {
+    enterprise_filings: SubRow['enterprise_filings'] | SubRow['enterprise_filings'][];
+  };
 
   const latestByEnterprise = new Map<string, SubRow>();
   for (const raw of rows || []) {
-    const row = raw as SubRow;
-    const ef = row.enterprise_filings;
+    const row = raw as unknown as RawSubRow;
+    const ef = Array.isArray(row.enterprise_filings)
+      ? row.enterprise_filings[0]
+      : row.enterprise_filings;
     if (!ef || ef.status !== 'approved') continue;
 
     const prev = latestByEnterprise.get(row.enterprise_id);
@@ -689,7 +728,7 @@ app.get('/api/analytics/by-region', requireAuth, async (req, res) => {
       row.period_year > prev.period_year ||
       (row.period_year === prev.period_year && row.period_quarter > prev.period_quarter)
     ) {
-      latestByEnterprise.set(row.enterprise_id, row);
+      latestByEnterprise.set(row.enterprise_id, { ...row, enterprise_filings: ef });
     }
   }
 
@@ -986,12 +1025,12 @@ app.get('/api/health', (_, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`
   ╔══════════════════════════════════════════════════════╗
   ║  云南省企业数据采集系统 Backend API                    ║
   ║  Server running on http://localhost:${PORT}           ║
-  ║  Supabase: ${process.env.SUPABASE_URL ? '✓ Connected' : '✗ Not configured'}                        ║
+  ║  Supabase: ${SUPABASE_URL ? '✓ Connected' : '✗ Not configured'}                        ║
   ╚══════════════════════════════════════════════════════╝
   `);
 });
