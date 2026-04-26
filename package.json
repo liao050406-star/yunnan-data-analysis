@@ -5,8 +5,9 @@
   "description": "云南省企业数据采集系统 - 全栈版本（前端 + 后端 + Supabase）",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:client": "vite --port=3000 --host=0.0.0.0",
+    "dev": "concurrently -k \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:reset": "node scripts/reset-dev-ports.cjs && npm run dev",
+    "dev:client": "vite --port=3000 --host=0.0.0.0 --strictPort",
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
@@ -15,6 +16,7 @@
     "lint": "tsc --noEmit",
     "db:init": "echo '请先运行 supabase/schema.sql，再按需运行 supabase/seed_test_data.sql，然后执行 npm run db:seed 写入演示企业与填报'",
     "db:seed": "tsx scripts/seed-demo.ts",
+    "db:seed:audit": "tsx scripts/seed-audit-demo.ts",
     "db:seed:sql": "echo '请在 Supabase SQL Editor 中运行 supabase/seed_test_data.sql（补充周期/政策/网格）'"
   },
   "dependencies": {

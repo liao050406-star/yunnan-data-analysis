@@ -310,7 +310,7 @@ app.get('/api/admin/filings', requireAuth, async (req, res) => {
 
   let query = supabase
     .from('enterprise_filings')
-    .select('*, user_profiles!inner(username, full_name)', { count: 'exact' });
+    .select('*', { count: 'exact' });
 
   if (status && status !== 'all') query = query.eq('status', status as string);
   if (region) query = query.ilike('address', `%${region}%`);
@@ -325,7 +325,19 @@ app.get('/api/admin/filings', requireAuth, async (req, res) => {
   const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
-  res.json({ filings: data, total: count, page: Number(page), limit: Number(limit) });
+  const userIds = [...new Set((data || []).map((row: any) => row.user_id).filter(Boolean))];
+  const { data: profiles, error: profilesError } = userIds.length
+    ? await supabase.from('user_profiles').select('id, username, full_name').in('id', userIds)
+    : { data: [], error: null };
+  if (profilesError) return res.status(500).json({ error: profilesError.message });
+
+  const profileById = new Map((profiles || []).map((row: any) => [row.id, row]));
+  const filings = (data || []).map((row: any) => ({
+    ...row,
+    user_profiles: profileById.get(row.user_id) || null,
+  }));
+
+  res.json({ filings, total: count, page: Number(page), limit: Number(limit) });
 });
 
 /**
@@ -975,12 +987,25 @@ app.get('/api/audit-logs', requireAuth, async (req, res) => {
 
   const { data, error, count } = await supabase
     .from('audit_logs')
-    .select('*, user_profiles(username, full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(offset, offset + Number(limit) - 1);
 
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ logs: data, total: count });
+
+  const userIds = [...new Set((data || []).map((row: any) => row.user_id).filter(Boolean))];
+  const { data: profiles, error: profilesError } = userIds.length
+    ? await supabase.from('user_profiles').select('id, username, full_name').in('id', userIds)
+    : { data: [], error: null };
+  if (profilesError) return res.status(500).json({ error: profilesError.message });
+
+  const profileById = new Map((profiles || []).map((row: any) => [row.id, row]));
+  const logs = (data || []).map((row: any) => ({
+    ...row,
+    user_profiles: profileById.get(row.user_id) || null,
+  }));
+
+  res.json({ logs, total: count });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
